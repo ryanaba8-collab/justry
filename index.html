@@ -114,9 +114,9 @@
   }
   .help-panel.show { display:block; }
 
- /* === Modern Floating Controls: aligned & styled === */
+/* === Override moderne pour les contrôles Leaflet ===
+   Coller ceci à la toute fin de votre <style> pour écraser les styles par défaut. */
 
-/* Barre d'outils alignée proprement */
 .leaflet-top.leaflet-left {
   display: flex !important;
   flex-direction: column !important;
@@ -126,80 +126,74 @@
   margin-left: 12px !important;
 }
 
-/* Boutons Leaflet: ronds, modernes, verts */
-.leaflet-bar a {
-  width: 42px !important;
-  height: 42px !important;
+/* Style général des boutons (ronds, ombre, transition) */
+.leaflet-bar a,
+.leaflet-draw-toolbar a {
+  width: 44px !important;
+  height: 44px !important;
+  line-height: 44px !important;
   border-radius: 50% !important;
   border: none !important;
   background: #ffffff !important;
-  box-shadow: 0 3px 10px rgba(0,0,0,0.2) !important;
+  color: #333 !important;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  transition: all 0.25s ease !important;
+  transition: transform 0.18s ease, background 0.18s ease !important;
 }
 
-.leaflet-bar a:hover {
+/* Hover */
+.leaflet-bar a:hover,
+.leaflet-draw-toolbar a:hover {
   background: #4CAF50 !important;
   color: #fff !important;
-  transform: scale(1.08) !important;
+  transform: translateY(-2px) scale(1.05) !important;
 }
 
-/* Icônes à l’intérieur (pour éviter la bordure grise Leaflet) */
-.leaflet-draw-toolbar a,
-.leaflet-draw-toolbar a:hover {
-  background: transparent !important;
+/* Retirer contours par défaut de leaflet-draw */
+.leaflet-draw-toolbar button,
+.leaflet-draw-toolbar a {
+  outline: none !important;
   border: none !important;
   box-shadow: none !important;
 }
 
-/* Ajustement du bouton "?" */
-.help-btn {
-  position: relative;
-  width: 42px !important;
-  height: 42px !important;
+/* Style du bouton d'aide (notre help-btn) une fois déplacé dans la colonne */
+.leaflet-top.leaflet-left .help-btn {
+  position: static !important;
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 50% !important;
   background: #4CAF50 !important;
   color: #fff !important;
-  border: none !important;
-  border-radius: 50% !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  box-shadow: 0 3px 10px rgba(0,0,0,0.25) !important;
+  display: grid !important;
+  place-items: center !important;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.18) !important;
   cursor: pointer !important;
-  transition: all 0.25s ease !important;
+  transition: transform 0.18s ease, background 0.18s ease !important;
+  margin-top: 6px !important;
 }
-
-.help-btn:hover {
+.leaflet-top.leaflet-left .help-btn:hover {
   background: #43A047 !important;
-  transform: scale(1.08) !important;
+  transform: translateY(-2px) scale(1.04) !important;
 }
 
-/* Espace supplémentaire sous la barre (pour le bouton ?) */
-.help-btn {
-  margin-top: 8px !important;
+/* Positionnement du panneau d'aide : on l'affiche à droite du toolbar */
+.help-panel {
+  position: absolute !important;
+  left: calc(56px + 12px) !important; /* à droite de la colonne de boutons */
+  top: 72px !important; /* ajuster si besoin */
+  z-index: 2500 !important;
+  display: none !important;
+  background: rgba(255,255,255,0.98) !important;
+  padding: 10px 12px !important;
+  border-radius: 10px !important;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12) !important;
+  max-width: 300px !important;
 }
+.help-panel.show { display: block !important; }
 
-
-/* Icône “?” modernisée */
-.help-btn {
-  width: 42px;
-  height: 42px;
-  background: #4CAF50;
-  color: #fff;
-  border: none;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.25);
-  transition: all 0.25s ease;
-}
-.help-btn:hover {
-  background: #43A047;
-  transform: scale(1.05);
-}
 
 </style>
 </head>
@@ -411,6 +405,80 @@
     helpPanel.style.top = `${top - mapRect.top}px`;
     helpPanel.style.visibility = '';
   }
+/* --- Attacher / déplacer help-btn dans la colonne leaflet (robuste) --- */
+function attachHelpIntoToolbar() {
+  const leftCol = document.querySelector('.leaflet-top.leaflet-left');
+  const helpBtn = document.getElementById('helpBtn');
+  const helpPanel = document.getElementById('helpPanel');
+
+  if (!leftCol || !helpBtn) {
+    // retry shortly if toolbar pas encore rendu
+    setTimeout(attachHelpIntoToolbar, 250);
+    return;
+  }
+
+  // Si le bouton est déjà enfant, on stoppe
+  if (leftCol.contains(helpBtn)) {
+    // update panel pos
+    positionHelpPanel();
+    return;
+  }
+
+  // retire position absolue initiale (pour éviter conflits)
+  helpBtn.style.position = 'static';
+  helpBtn.style.left = '';
+  helpBtn.style.top = '';
+  helpBtn.style.margin = '0';
+
+  // ajoute le bouton à la colonne (dernier enfant)
+  leftCol.appendChild(helpBtn);
+
+  // s'assure que panel est bien dans map container pour position absolue relative
+  const mapEl = document.getElementById('map');
+  if (helpPanel && mapEl && !mapEl.contains(helpPanel)) {
+    mapEl.appendChild(helpPanel);
+  }
+
+  // calcule et met à jour la position du panel
+  positionHelpPanel();
+  window.addEventListener('resize', positionHelpPanel);
+  // observe mutations (toolbar dynamique)
+  const mo = new MutationObserver(() => positionHelpPanel());
+  mo.observe(leftCol, {childList:true, subtree:true});
+}
+
+function positionHelpPanel(){
+  const helpBtn = document.getElementById('helpBtn');
+  const helpPanel = document.getElementById('helpPanel');
+  const mapEl = document.getElementById('map');
+  if (!helpBtn || !helpPanel || !mapEl) return;
+  const mapRect = mapEl.getBoundingClientRect();
+  const btnRect = helpBtn.getBoundingClientRect();
+  // placer le panel à droite du bouton, à l'intérieur du conteneur map
+  helpPanel.style.left = (btnRect.right - mapRect.left + 8) + 'px';
+  helpPanel.style.top = (btnRect.top - mapRect.top) + 'px';
+}
+
+// appel quand la carte est prête (utilise whenReady si disponible)
+try {
+  map.whenReady(function(){
+    setTimeout(attachHelpIntoToolbar, 200); // petit délai pour laisser leaflet insérer la toolbar
+  });
+} catch(e) {
+  // fallback si map n'existe pas encore
+  setTimeout(attachHelpIntoToolbar, 500);
+}
+
+// toggle déjà présent : on utilise ta fonction toggleHelp existante (si elle existe)
+const existingHelpBtn = document.getElementById('helpBtn');
+if (existingHelpBtn) {
+  existingHelpBtn.addEventListener('click', function(e){
+    const panel = document.getElementById('helpPanel');
+    if (!panel) return;
+    panel.classList.toggle('show'); // notre CSS gère display
+    positionHelpPanel();
+  });
+}
 
   window.addEventListener('resize', positionHelpButton);
   setTimeout(positionHelpButton, 0);
