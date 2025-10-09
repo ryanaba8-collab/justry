@@ -124,6 +124,58 @@
   }
   /* Important: no filter/shadows on draw icons to avoid GPU seams on some devices */
   .leaflet-draw-toolbar a { /* intentionally empty */ }
+  /* === Modern floating controls === */
+
+/* Barre verticale à gauche */
+.leaflet-top.leaflet-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px; /* espacement entre les boutons */
+  margin-top: 60px; /* pour laisser la loupe au-dessus */
+  margin-left: 12px;
+}
+
+/* Boutons Leaflet plus modernes */
+.leaflet-bar a {
+  width: 42px;
+  height: 42px;
+  line-height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.leaflet-bar a:hover {
+  background: #4CAF50;
+  color: #fff;
+  transform: scale(1.05);
+}
+
+/* Icône “?” modernisée */
+.help-btn {
+  width: 42px;
+  height: 42px;
+  background: #4CAF50;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+  transition: all 0.25s ease;
+}
+.help-btn:hover {
+  background: #43A047;
+  transform: scale(1.05);
+}
+
 </style>
 </head>
 <body>
