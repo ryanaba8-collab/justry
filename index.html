@@ -114,48 +114,73 @@
   }
   .help-panel.show { display:block; }
 
-  /* ===== Draw toolbar: placement & size (keep icons intact; no filters) ===== */
-  .leaflet-top.leaflet-left {
-    margin-top: 64px;   /* leave room for magnifier above */
-    margin-left: 10px;
-  }
-  .leaflet-bar a, .leaflet-bar a:hover {
-    width: 38px; height: 38px; line-height: 38px;
-  }
-  /* Important: no filter/shadows on draw icons to avoid GPU seams on some devices */
-  .leaflet-draw-toolbar a { /* intentionally empty */ }
-  /* === Modern floating controls === */
+ /* === Modern Floating Controls: aligned & styled === */
 
-/* Barre verticale à gauche */
+/* Barre d'outils alignée proprement */
 .leaflet-top.leaflet-left {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px; /* espacement entre les boutons */
-  margin-top: 60px; /* pour laisser la loupe au-dessus */
-  margin-left: 12px;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin-top: 60px !important;
+  margin-left: 12px !important;
 }
 
-/* Boutons Leaflet plus modernes */
+/* Boutons Leaflet: ronds, modernes, verts */
 .leaflet-bar a {
-  width: 42px;
-  height: 42px;
-  line-height: 42px;
-  border-radius: 50%;
-  border: none;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 50% !important;
+  border: none !important;
+  background: #ffffff !important;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.2) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.25s ease !important;
 }
 
 .leaflet-bar a:hover {
-  background: #4CAF50;
-  color: #fff;
-  transform: scale(1.05);
+  background: #4CAF50 !important;
+  color: #fff !important;
+  transform: scale(1.08) !important;
 }
+
+/* Icônes à l’intérieur (pour éviter la bordure grise Leaflet) */
+.leaflet-draw-toolbar a,
+.leaflet-draw-toolbar a:hover {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Ajustement du bouton "?" */
+.help-btn {
+  position: relative;
+  width: 42px !important;
+  height: 42px !important;
+  background: #4CAF50 !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.25) !important;
+  cursor: pointer !important;
+  transition: all 0.25s ease !important;
+}
+
+.help-btn:hover {
+  background: #43A047 !important;
+  transform: scale(1.08) !important;
+}
+
+/* Espace supplémentaire sous la barre (pour le bouton ?) */
+.help-btn {
+  margin-top: 8px !important;
+}
+
 
 /* Icône “?” modernisée */
 .help-btn {
