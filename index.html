@@ -71,12 +71,32 @@
     font:14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     box-shadow:0 2px 8px rgba(0,0,0,.25); white-space:nowrap;
   }
-  .copy-toast {
-    position:fixed; left:50%; bottom:18px; transform:translateX(-50%);
-    background:#111; color:#fff; padding:6px 10px; border-radius:8px;
-    font:12px system-ui; z-index:1500; opacity:0; transition:opacity .2s;
-  }
-  .copy-toast.show { opacity:1; }
+ .copy-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  background: #ffffff;
+  color: #2e7d32;
+  padding: 10px 16px;
+  border: 2px solid #4CAF50;
+  border-radius: 10px;
+  font: 15px "Segoe UI", Arial, sans-serif;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 1500;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.copy-toast.show {
+  opacity: 1;
+}
+.copy-toast span.icon {
+  font-size: 18px;
+}
+
 
   /* ===== Help controls (inline with draw tools) ===== */
   .help-btn {
@@ -132,7 +152,12 @@
 </div>
 
 <div id="map"></div>
-<div class="copy-toast" id="toast">Copied m² to clipboard</div>
+
+<div class="copy-toast" id="toast">
+  <span class="icon">✅</span>
+  Copied m² to clipboard
+</div>
+
 
 <script>
   // ===== Basemaps =====
@@ -190,14 +215,29 @@
     return { type:"Feature", geometry:{ type:"Polygon", coordinates:[ring] }, properties:{} };
   }
 
-  function copyToClipboard(text){
-    const toast = document.getElementById('toast');
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(()=>{
-        toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'), 900);
-      });
-    }
+  function copyToClipboard(text) {
+  const toast = document.getElementById('toast');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      // Affiche le message visuel
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2000);
+    }).catch(err => {
+      console.error("Erreur de copie :", err);
+    });
+  } else {
+    // Fallback ancien navigateur
+    const temp = document.createElement('textarea');
+    temp.value = text;
+    document.body.appendChild(temp);
+    temp.select();
+    document.execCommand('copy');
+    document.body.removeChild(temp);
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
   }
+}
+
 
   function updateAreaAndLabel(){
     if (!poly) return;
