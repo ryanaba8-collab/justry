@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Carte cadastrale — Recherche + Copie fiable</title>
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Leaflet Draw -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+
+<!-- Divers -->
+<script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
+
+<style>
+html,body{height:100%;margin:0;background:#000;}
+#map{position:fixed;inset:0;}
+
+/* Barre de recherche */
+.search-box {
+  position:absolute; top:10px; left:10px;
+  z-index:1200; display:flex; align-items:center;
+  background:#fff; border-radius:999px;
+  box-shadow:0 2px 8px rgba(0,0,0,.25);
+  padding:6px 10px; width:42px; overflow:hidden;
+  transition:width .3s ease;
+}
+.search-box.open, .search-box:hover { width:min(80vw,340px); }
+.search-icon { flex:0 0 auto; cursor:pointer; font-size:18px; }
+.search-input {
+  flex:1 1 auto; border:none; outline:none;
+  background:transparent; font:14px system-ui;
+  margin-left:6px;
+}
+.locate-btn {
+  flex:0 0 auto; font-size:18px; cursor:pointer;
+  margin-left:6px; color:#4285f4;
+}
+
+/* Suggestions style Google Maps */
+.suggestions {
+  position:absolute; top:50px; left:10px;
+  width:min(80vw,340px); background:#fff;
+  border-radius:12px; box-shadow:0 4px 14px rgba(0,0,0,.25);
+  z-index:1300; overflow:hidden;
+}
+.suggestion { display:flex; align-items:flex-start; gap:10px;
+  padding:10px 14px; border-bottom:1px solid #f2f2f2;
+  cursor:pointer; transition:background .2s;
+}
+.suggestion:last-child { border-bottom:none; }
+.suggestion:hover { background:#f5f5f5; }
+.suggestion-icon { font-size:18px; margin-top:3px; color:#4285f4; }
+.suggestion-text { display:flex; flex-direction:column; }
+.suggestion-title { font-weight:500; color:#202124; font-size:14px; line-height:1.2; }
+.suggestion-desc { color:#5f6368; font-size:12px; margin-top:2px; }
+
+/* Toast générique */
+.toast {
+  position:fixed; left:50%; bottom:16px;
+  transform:translateX(-50%);
+  background:#111; color:#fff;
+  padding:6px 10px; border-radius:8px;
+  font:12px system-ui;
+  opacity:0; transition:opacity .25s ease;
+  z-index:1500;
+}
+.toast.show {opacity:1;}
+
+/* ✅ Toast copie */
+.copy-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%) translateY(8px);
+  background: #111;
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font: 13px system-ui, Arial;
+  z-index: 2000;
+  opacity: 0;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+}
+.copy-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.copy-toast .ok {
+  display:inline-block; margin-right:8px;
+  background:#2e7d32; color:#fff;
+  width:20px;height:20px;border-radius:50%;
+  text-align:center;line-height:20px;font-size:12px;
+}
+
+/* Toolbar droite */
+.toolbar {
+  position:fixed; right:10px; top:10px;
+  display:flex; gap:10px; z-index:1600;
+}
+.btn {
+  background:#fff; border:1px solid #ddd;
+  border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,.15);
+  font:13px system-ui; padding:8px 10px; cursor:pointer;
+}
+
+/* Divers */
+.zoom-indicator {
+  background:rgba(0,0,0,.6); color:#fff;
+  padding:4px 8px; border-radius:8px;
+  font:13px system-ui; margin:8px;
+}
+.area-label, .length-label {
+  background:rgba(0,0,0,0.45);
+  color:#fff; padding:4px 8px;
+  border-radius:8px; font:14px system-ui;
+  white-space:nowrap; cursor:pointer;
+  transition:background .3s;
+}
+.area-label:hover, .length-label:hover { background:rgba(0,150,0,0.5); }
+
+/* Style visuel de la “Haie” (polyligne fine en pointillés) */
+.haies-line{
+  stroke:#00C853 !important;
+  stroke-width:2 !important;
+  stroke-opacity:0.95 !important;
+  stroke-dasharray:6 3 !important;
+}
+
+.leaflet-frozen {filter:grayscale(0.2) brightness(0.95);transition:filter .3s;}
+.leaflet-control-zoom {margin-top:80px!important;}
+
+/* Loader circulaire */
+.loader-overlay {
+  position:fixed; inset:0;
+  background:rgba(0,0,0,0.5);
+  display:flex; align-items:center; justify-content:center;
+  z-index:2000; backdrop-filter:blur(2px);
+  opacity:0; pointer-events:none; transition:opacity .3s;
+}
+.loader-overlay.show { opacity:1; pointer-events:all; }
+.loader {
+  border:5px solid rgba(255,255,255,0.3);
+  border-top:5px solid #fff; border-radius:50%;
+  width:50px; height:50px; animation:spin 1s linear infinite;
+}
+@keyframes spin {100%{transform:rotate(360deg);}}
+  .loupe-icon { width:18px; height:18px; display:block; }
+ .camera-icon {
+  vertical-align: middle;
+  transition: transform .2s ease, opacity .2s ease;
+}
+#btnFreeze:hover .camera-icon {
+  transform: scale(1.1);
+  opacity: 0.9;
+}
+
+.undo-icon {
+  vertical-align: middle;
+  transition: transform .2s ease;
+}
+#btnUnfreeze:hover .undo-icon {
+  transform: rotate(-15deg);
+}
+.raster-icon {
+  vertical-align: middle;
+  transition: transform .25s ease, opacity .25s ease;
+}
+#btnRaster:hover .raster-icon {
+  transform: rotate(8deg) scale(1.05);
+  opacity: 0.9;
+}
+.help-icon {
+  vertical-align: middle;
+  transition: transform .25s ease, opacity .25s ease;
+}
+#btnHelp:hover .help-icon {
+  transform: scale(1.1);
+  opacity: 0.9;
+}
+
+.locate-icon {
+  vertical-align: middle;
+  transition: transform .25s ease, opacity .25s ease;
+}
+.locate-btn:hover .locate-icon {
+  transform: scale(1.15);
+  opacity: 0.9;
+}
+
+ /* 🌍 — Ajustements responsives automatiques pour Leaflet + Toolbar */
+@media (max-width: 768px) {
+  /* Carte : on garde la hauteur totale */
+  #map {
+    height: 100vh;
+  }
+
+  /* ✅ Toolbar (Freeze, Raster, etc.) */
+  .toolbar {
+    right: 6px;
+    top: 6px;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 1600;
+  }
+
+  .btn {
+    padding: 10px 12px;
+    font-size: 15px;
+    border-radius: 12px;
+    box-shadow: 0 3px 8px rgba(0,0,0,.25);
+  }
+
+  .btn svg {
+    width: 26px !important;
+    height: 26px !important;
+  }
+
+  /* ✅ Barre de recherche */
+  .search-box {
+    top: 8px;
+    left: 8px;
+    width: min(90vw, 320px);
+    padding: 8px 12px;
+  }
+
+  .search-input {
+    font-size: 15px;
+  }
+
+  .loupe-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .locate-btn svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  /* ✅ Toasts */
+  .toast, .copy-toast {
+    font-size: 14px;
+    padding: 10px 14px;
+  }
+
+  /* ✅ Labels sur la carte */
+  .area-label, .length-label {
+    font-size: 15px;
+    padding: 6px 10px;
+    border-radius: 10px;
+  }
+
+  /* ✅ Icônes du panneau d’aide */
+  .help-icon,
+  .camera-icon,
+  .undo-icon,
+  .raster-icon,
+  .locate-icon {
+    width: 26px;
+    height: 26px;
+  }
+}
+
+@media (min-width: 769px) {
+  /* Pour les grands écrans : garder les tailles normales */
+  .btn svg,
+  .loupe-icon,
+  .locate-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+/* ✅ Ajustement intelligent façon Google Maps (mobile optimisé avec bouton Retour) */
+@media (max-width: 768px) {
+  #map { height: 100vh; }
+
+  /* 🔹 Barre d’outils mobile */
+  .toolbar {
+    position: fixed;
+    right: 10px;
+    top: 66px; /* ↓ décale la toolbar sous la barre de recherche */
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    z-index: 1600;
+  }
+
+  .btn {
+    padding: 6px 9px;
+    font-size: 13px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 92px;
+    transition: all .2s ease;
+  }
+
+  .btn svg {
+    width: 20px !important;
+    height: 20px !important;
+    margin-right: 5px;
+  }
+
+  .btn span {
+    font-size: 13px;
+  }
+
+  /* 🔹 Position du bouton "Retour à la carte" (Unfreeze) */
+  #btnUnfreeze {
+    order: -1; /* 💡 le place au-dessus des autres quand il apparaît */
+  }
+
+  /* 🔹 Barre de recherche plus compacte */
+  .search-box {
+    top: 8px;
+    left: 8px;
+    width: min(85vw, 320px);
+    padding: 8px 12px;
+  }
+
+  .search-input { font-size: 15px; }
+  .loupe-icon { width: 22px; height: 22px; }
+  .locate-btn svg { width: 22px; height: 22px; }
+
+  /* 🔹 Toasts et labels lisibles sur mobile */
+  .toast, .copy-toast {
+    font-size: 14px;
+    padding: 10px 14px;
+  }
+
+  .area-label, .length-label {
+    font-size: 15px;
+    padding: 6px 10px;
+    border-radius: 10px;
+  }
+
+  .help-icon, .camera-icon, .undo-icon, .raster-icon, .locate-icon {
+    width: 22px;
+    height: 22px;
+  }
+}
+/* ✅ Correction mobile : forcer la cohérence de hidden */
+.btn[hidden] {
+  display: none !important;
+  visibility: hidden !important;
+}
+/* ✅ Amélioration de la fenêtre d’aide (HTML inchangé) */
+#helpModal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 3000;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.3s ease;
+}
+
+#helpModal.show {
+  display: flex;
+  opacity: 1;
+}
+
+/* ✅ Conteneur du contenu d’aide */
+#helpModal .help-content {
+  position: relative;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 25px rgba(0, 0, 0, 0.25);
+  padding: 20px 22px;
+  color: #333;
+  transform: scale(0.95);
+  opacity: 0;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+  max-width: 420px;
+  width: 90%;
+}
+
+#helpModal.show .help-content {
+  transform: scale(1);
+  opacity: 1;
+}
+
+/* ✅ Bouton de fermeture */
+#helpClose {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  cursor: pointer;
+  font-size: 22px;
+  color: #555;
+  transition: color 0.2s ease;
+}
+#helpClose:hover {
+  color: #000;
+}
+
+/* ✅ Aide universelle : centrage et visibilité desktop + mobile */
+#helpModal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 3000;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.3s ease;
+}
+#helpModal.show {
+  display: flex;
+  opacity: 1;
+}
+#helpModal .help-content {
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  margin: auto !important;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 25px rgba(0,0,0,0.25);
+  padding: 20px 22px;
+  color: #333;
+  transform: scale(0.95);
+  opacity: 0;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+  max-width: 420px;
+  width: 90%;
+}
+#helpModal.show .help-content {
+  transform: scale(1);
+  opacity: 1;
+}
+#helpClose {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  cursor: pointer;
+  font-size: 22px;
+  color: #555;
+}
+@media (max-width: 768px) {
+  #helpModal .help-content {
+    width: 90vw;
+    max-height: 80vh;
+    overflow-y: auto;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+}
+
+
+ 
+</style>
+</head>
+
+<body>
+<div id="map"></div>
+<div class="toast" id="note"></div>
+
+<!-- ✅ Toast de copie -->
+<div class="copy-toast" id="copyToast">
+  <span class="ok">✓</span><span id="copyToastText">m² copiés</span>
+</div>
+
+<!-- Loader -->
+<div class="loader-overlay" id="loaderOverlay">
+  <div class="loader"></div>
+</div>
+
+<!-- Barre de recherche -->
+<div class="search-box" id="searchBox">
+ <div class="search-icon" id="searchIcon" aria-label="Rechercher" title="Rechercher">
+  <svg class="loupe-icon" viewBox="0 0 24 24" role="img" aria-hidden="true">
+    <circle cx="10" cy="10" r="6" fill="none" stroke="#22c55e" stroke-width="3"/>
+    <line x1="14.5" y1="14.5" x2="21" y2="21" stroke="#22c55e" stroke-width="3" stroke-linecap="round"/>
+  </svg>
+</div>
+
+  <input class="search-input" id="searchInput" type="text" placeholder="Rechercher une adresse...">
+  <div class="locate-btn" id="locateBtn" aria-label="Localisation" title="Me localiser">
+  <svg class="locate-icon" viewBox="0 0 24 24" width="20" height="20" role="img" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" fill="none" stroke="#22c55e" stroke-width="2"/>
+    <circle cx="12" cy="12" r="3" fill="#22c55e"/>
+    <line x1="12" y1="2" x2="12" y2="5" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+    <line x1="12" y1="19" x2="12" y2="22" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+    <line x1="2" y1="12" x2="5" y2="12" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+    <line x1="19" y1="12" x2="22" y2="12" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+  </svg>
+</div>
+
+</div>
+  
+<div class="suggestions" id="suggestions" style="display:none;"></div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+ <button class="btn" id="btnFreeze" aria-label="Capture de la carte" title="Capture de la carte">
+  <svg class="camera-icon" viewBox="0 0 24 24" width="20" height="20" role="img" aria-hidden="true">
+    <rect x="3" y="6" width="18" height="14" rx="2" ry="2" fill="none" stroke="#22c55e" stroke-width="2"/>
+    <circle cx="12" cy="13" r="4" fill="none" stroke="#22c55e" stroke-width="2"/>
+    <rect x="9" y="3" width="6" height="3" rx="1" ry="1" fill="#22c55e"/>
+  </svg>
+  <span style="margin-left:6px;">Capture</span>
+</button>
+
+
+  <button class="btn" id="btnUnfreeze" hidden aria-label="Retour à la carte" title="Retour à la carte">
+  <svg class="undo-icon" viewBox="0 0 24 24" width="20" height="20" role="img" aria-hidden="true">
+    <polyline points="9 14 4 9 9 4" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M4 9h9a7 7 0 1 1 0 14h-3" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+  </svg>
+  <span style="margin-left:6px;">Retour</span>
+</button>
+
+  <button class="btn" id="btnRaster" aria-label="Afficher ou masquer le cadastre" title="Afficher ou masquer le cadastre">
+  <svg class="raster-icon" viewBox="0 0 24 24" width="20" height="20" role="img" aria-hidden="true">
+    <!-- cadre principal -->
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" fill="none" stroke="#22c55e" stroke-width="2"/>
+    <!-- grille -->
+    <line x1="8" y1="3" x2="8" y2="21" stroke="#22c55e" stroke-width="1.5"/>
+    <line x1="16" y1="3" x2="16" y2="21" stroke="#22c55e" stroke-width="1.5"/>
+    <line x1="3" y1="8" x2="21" y2="8" stroke="#22c55e" stroke-width="1.5"/>
+    <line x1="3" y1="16" x2="21" y2="16" stroke="#22c55e" stroke-width="1.5"/>
+  </svg>
+  <span style="margin-left:6px;">Cadastre on/off</span>
+</button>
+
+  <button class="btn" id="btnHelp" aria-label="Aide rapide" title="Aide rapide">
+  <svg class="help-icon" viewBox="0 0 24 24" width="20" height="20" role="img" aria-hidden="true">
+    <circle cx="12" cy="12" r="10" fill="none" stroke="#22c55e" stroke-width="2"/>
+    <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4v1" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="12" cy="17" r="0.8" fill="#22c55e"/>
+  </svg>
+  <span style="margin-left:6px;">Help</span>
+</button>
+
+
+</div>
+ <!-- Fenêtre d’aide -->
+<div class="help-modal" id="helpModal" style="display:none;">
+  <div class="help-content" style="
+    background:#fff; color:#111; padding:20px; border-radius:12px;
+    max-width:360px; font:14px system-ui; box-shadow:0 8px 30px rgba(0,0,0,0.4);
+    position:relative;top: 80px;left:980px;">
+    <div id="helpClose" style="
+      position:absolute; top:6px; right:6px; cursor:pointer;
+      font-size:18px; color:#666;">✖</div>
+  <h3 style="margin-top:0; color:#1E88E5;">ℹ️ Aide rapide</h3>
+
+<div style="display:flex; flex-direction:column; gap:6px; line-height:1.6; font:14px system-ui;">
+
+  <!-- 🟩 Outils de dessin -->
+  <p style="margin:0;">
+    <b>▱ Polygone :</b> dessinez une zone pour mesurer la surface (m²).<br>
+    <b>📏 Ligne :</b> tracez une ligne pour mesurer la longueur (m / km).<br>
+    <b>🗑️ Delete :</b> supprime le dernier polygone ou la ligne.<br>
+    <b>✎ Edit :</b> déplacez les sommets pour affiner la forme.
+  </p>
+
+  <hr style="border:none; border-top:1px solid #ddd; margin:6px 0;">
+
+  <!-- 🟩 Fonctions principales -->
+  <span style="display:inline-flex; align-items:center; gap:6px;">
+    <svg viewBox="0 0 24 24" width="18" height="18" style="vertical-align:-2px;">
+      <rect x="3" y="6" width="18" height="14" rx="2" ry="2"
+            fill="none" stroke="#22c55e" stroke-width="2"/>
+      <circle cx="12" cy="13" r="4"
+              fill="none" stroke="#22c55e" stroke-width="2"/>
+      <rect x="9" y="3" width="6" height="3" rx="1" ry="1" fill="#22c55e"/>
+    </svg>
+    <b>Capture :</b> capture la carte actuelle.
+  </span>
+
+  <span style="display:inline-flex; align-items:center; gap:6px;">
+    <svg viewBox="0 0 24 24" width="18" height="18" style="vertical-align:-2px;">
+      <polyline points="9 14 4 9 9 4"
+                fill="none" stroke="#22c55e" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M4 9h9a7 7 0 1 1 0 14h-3"
+            fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <b>Retour :</b> revient à la vue interactive.
+  </span>
+
+  <span style="display:inline-flex; align-items:center; gap:6px;">
+    <svg viewBox="0 0 24 24" width="18" height="18" style="vertical-align:-2px;">
+      <circle cx="12" cy="12" r="9"
+              fill="none" stroke="#22c55e" stroke-width="2"/>
+      <circle cx="12" cy="12" r="3" fill="#22c55e"/>
+      <line x1="12" y1="2"  x2="12" y2="5"
+            stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+      <line x1="12" y1="19" x2="12" y2="22"
+            stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+      <line x1="2"  y1="12" x2="5"  y2="12"
+            stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+      <line x1="19" y1="12" x2="22" y2="12"
+            stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <b>Localisation :</b> centrez-vous sur votre position.
+  </span>
+
+  <span style="display:inline-flex; align-items:center; gap:6px;">
+    <svg viewBox="0 0 24 24" width="18" height="18" style="vertical-align:-2px;">
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"
+            fill="none" stroke="#22c55e" stroke-width="2"/>
+      <line x1="8" y1="3" x2="8" y2="21"
+            stroke="#22c55e" stroke-width="1.5"/>
+      <line x1="16" y1="3" x2="16" y2="21"
+            stroke="#22c55e" stroke-width="1.5"/>
+      <line x1="3" y1="8" x2="21" y2="8"
+            stroke="#22c55e" stroke-width="1.5"/>
+      <line x1="3" y1="16" x2="21" y2="16"
+            stroke="#22c55e" stroke-width="1.5"/>
+    </svg>
+    <b>Cadastre :</b> affiche ou masque le cadastre.
+  </span>
+
+</div>
+
+
+</div>
+
+    <p style="text-align:center;color:#888;margin-top:12px;">© Carte cadastrale personnalisée</p>
+  </div>
+</div>
+
+
+<script>
+/* ---------- Fonds IGN ---------- */
+const URL_ORTHO='https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&STYLE=normal&TILEMATRIXSET=PM&FORMAT=image/jpeg&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}';
+const URL_PARCELLAIRE='https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&STYLE=normal&TILEMATRIXSET=PM&FORMAT=image/png&LAYER=CADASTRALPARCELS.PARCELLAIRE_EXPRESS&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}';
+const ignOrthos=L.tileLayer(URL_ORTHO,{maxZoom:22,maxNativeZoom:19,attribution:'© IGN'});
+const cadRaster=L.tileLayer(URL_PARCELLAIRE,{maxZoom:22,maxNativeZoom:19,opacity:.85,zIndex:600,attribution:'© IGN'});
+const MAX_NET_ZOOM=19;
+const map=L.map('map',{layers:[ignOrthos,cadRaster],maxZoom:MAX_NET_ZOOM,minZoom:2}).setView([48.7064,2.0382],18);
+
+/* ---------- Toast générique ---------- */
+function toast(msg){
+  const t=document.getElementById('note');
+  t.textContent=msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),1200);
+}
+
+/* ---------- Toast copie ---------- */
+function showCopyToast(message='m² copiés') {
+  const t=document.getElementById('copyToast');
+  const txt=document.getElementById('copyToastText');
+  if(txt) txt.textContent = message;
+  t.classList.add('show');
+  clearTimeout(t._hideTimeout);
+  t._hideTimeout=setTimeout(()=>t.classList.remove('show'),1400);
+}
+
+/* ---------- Copie robuste ---------- */
+function copyToClipboard(text){
+  const payload = (typeof text==='string') ? text : String(text);
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(payload)
+      .then(()=> showCopyToast('✔️ ' + payload + ' copiés'))
+      .catch(()=> fallbackCopy(payload));
+  } else fallbackCopy(payload);
+
+  function fallbackCopy(str){
+    try {
+      const ta=document.createElement('textarea');
+      ta.value=str; ta.style.position='fixed'; ta.style.left='-9999px';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showCopyToast('✔️ ' + str + ' copiés');
+    } catch(e){ showCopyToast('Échec copie'); }
+  }
+}
+
+/* ---------- Recherche Photon + géoloc ---------- */
+const searchBox=document.getElementById('searchBox');
+const searchIcon=document.getElementById('searchIcon');
+const searchInput=document.getElementById('searchInput');
+const locateBtn=document.getElementById('locateBtn');
+const suggestions=document.getElementById('suggestions');
+let currentMarker=null;
+const blueIcon=L.icon({
+  iconUrl:'https://maps.gstatic.com/mapfiles/api-3/images/spotlight-poi2_hdpi.png',
+  iconSize:[27,43], iconAnchor:[13,41]
+});
+function placeMarker(lat,lng){
+  if(currentMarker) map.removeLayer(currentMarker);
+  currentMarker=L.marker([lat,lng],{icon:blueIcon}).addTo(map);
+  currentMarker._icon.classList.add('fade-marker');
+  currentMarker.on('click',()=>{map.removeLayer(currentMarker);currentMarker=null;});
+}
+function geocodeAndCenter(q){
+  fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1&lang=fr`)
+  .then(r=>r.json()).then(data=>{
+    if(data.features.length){
+      const f=data.features[0]; const lat=f.geometry.coordinates[1],lng=f.geometry.coordinates[0];
+      map.setView([lat,lng],18); placeMarker(lat,lng);
+    } else toast('Aucune adresse trouvée');
+  });
+}
+searchIcon.addEventListener('click',()=>searchBox.classList.toggle('open'));
+searchInput.addEventListener('focus',()=>searchBox.classList.add('open'));
+let searchTimeout=null;
+searchInput.addEventListener('input',()=>{
+  clearTimeout(searchTimeout);
+  const q=searchInput.value.trim();
+  if(!q){suggestions.style.display='none';return;}
+  searchTimeout=setTimeout(()=>{
+    fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lang=fr`)
+    .then(r=>r.json()).then(data=>{
+      suggestions.innerHTML='';
+      if(!data.features.length){suggestions.style.display='none';return;}
+      data.features.forEach(f=>{
+        const p=f.properties;
+        const title=(p.housenumber?p.housenumber+' ':'')+(p.street||p.name||'Adresse');
+        const desc=[p.postcode,p.city,p.country].filter(Boolean).join(', ');
+        const div=document.createElement('div');
+        div.className='suggestion';
+        div.innerHTML=`<div class="suggestion-icon">📍</div>
+                       <div class="suggestion-text">
+                         <div class="suggestion-title">${title}</div>
+                         <div class="suggestion-desc">${desc}</div>
+                       </div>`;
+        div.addEventListener('click',()=>{
+          const lat=f.geometry.coordinates[1],lng=f.geometry.coordinates[0];
+          map.setView([lat,lng],18); placeMarker(lat,lng);
+          searchInput.value=`${title}, ${desc}`;
+          suggestions.style.display='none';
+        });
+        suggestions.appendChild(div);
+      });
+      suggestions.style.display='block';
+    });
+  },300);
+});
+searchInput.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){ e.preventDefault();
+    const q=searchInput.value.trim();
+    if(q) geocodeAndCenter(q);
+  }
+});
+map.on('click',()=>suggestions.style.display='none');
+locateBtn.addEventListener('click',()=>{
+  const q=searchInput.value.trim();
+  if(q){ geocodeAndCenter(q); }
+  else if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(pos=>{
+      const lat=pos.coords.latitude,lng=pos.coords.longitude;
+      map.setView([lat,lng],18); placeMarker(lat,lng); toast('📍 Vous êtes ici');
+    },()=>toast('⚠️ Impossible de récupérer la position'));
+  } else toast('🌍 Géolocalisation non supportée');
+});
+
+/* ---------- Dessin ---------- */
+const drawnItems=new L.FeatureGroup().addTo(map);
+map.addControl(new L.Control.Draw({
+  position:'topleft',
+  draw:{
+    polygon:{shapeOptions:{color:'#1E88E5',weight:2,fillOpacity:.25}},
+    /* ✅ Ajout : outil “Haie” (polyligne) */
+    polyline:{shapeOptions:{color:'#00C853',weight:2,opacity:0.95,dashArray:'6 3',className:'haies-line'}},
+    rectangle:false,circle:false,circlemarker:false,marker:false
+  },
+  edit:{featureGroup:drawnItems,edit:true,remove:true}
+}));
+/* ==========================================================
+   🔠 TRADUCTION COMPLÈTE LEAFLET DRAW — VERSION FRANÇAISE
+   ========================================================== */
+
+/* --- 1️⃣ Traduction de la barre d’actions (Finish / Delete last point / Cancel) --- */
+function translateDrawActions() {
+  const bar = document.querySelector('.leaflet-draw-actions');
+  if (!bar) return;
+  const links = bar.querySelectorAll('a');
+
+  // Ordre : [Finish, Delete last point, Cancel]
+  if (links[0]) {
+    links[0].textContent = 'Terminer';
+    links[0].setAttribute('title', 'Terminer le dessin');
+  }
+  if (links[1]) {
+    links[1].textContent = 'Supprimer le dernier point';
+    links[1].setAttribute('title', 'Supprimer le dernier point dessiné');
+  }
+  if (links[2]) {
+    links[2].textContent = 'Annuler';
+    links[2].setAttribute('title', 'Annuler le dessin');
+  }
+}
+
+['draw:drawstart', 'draw:created', 'draw:editstart', 'draw:editstop'].forEach(evt => {
+  map.on(evt, () => setTimeout(translateDrawActions, 0));
+});
+setTimeout(translateDrawActions, 800);
+
+
+/* --- 2️⃣ Traduction des infobulles de la toolbar (icônes de gauche) --- */
+function translateToolbarTitles() {
+  const q = sel => document.querySelector(sel);
+
+  const btnPolyline = q('.leaflet-draw-draw-polyline');
+  if (btnPolyline) btnPolyline.setAttribute('title', 'Tracer une ligne');
+
+  const btnPolygon = q('.leaflet-draw-draw-polygon');
+  if (btnPolygon) btnPolygon.setAttribute('title', 'Tracer un polygone');
+
+  const btnEdit = q('.leaflet-draw-edit-edit');
+  if (btnEdit) btnEdit.setAttribute('title', 'Modifier des formes');
+
+  const btnDelete = q('.leaflet-draw-edit-remove');
+  if (btnDelete) btnDelete.setAttribute('title', 'Supprimer des formes');
+}
+
+setTimeout(translateToolbarTitles, 0);
+setTimeout(translateToolbarTitles, 800);
+
+
+/* --- 3️⃣ Traduction de la barre d’édition (Save / Cancel) --- */
+function translateEditActions() {
+  const bars = document.querySelectorAll('.leaflet-draw-actions');
+
+  bars.forEach(bar => {
+    const links = bar.querySelectorAll('a');
+    links.forEach(link => {
+      const txt = link.textContent.trim();
+      if (txt === 'Save') {
+        link.textContent = 'Enregistrer';
+        link.setAttribute('title', 'Enregistrer les modifications');
+      } else if (txt === 'Cancel') {
+        link.textContent = 'Annuler';
+        link.setAttribute('title', 'Annuler les modifications');
+      }
+    });
+  });
+}
+
+['draw:editstart', 'draw:editvertex', 'draw:editstop'].forEach(evt => {
+  map.on(evt, () => setTimeout(translateEditActions, 0));
+});
+setTimeout(translateEditActions, 1000);
+
+
+/* --- 4️⃣ Traduction des messages "No layers to edit / delete" --- */
+function translateNoLayerMessages() {
+  const editMsg = document.querySelector('.leaflet-draw-edit-edit.leaflet-disabled');
+  const deleteMsg = document.querySelector('.leaflet-draw-edit-remove.leaflet-disabled');
+
+  // Infobulles (tooltips)
+  if (editMsg && editMsg.getAttribute('title')?.includes('No layers to edit')) {
+    editMsg.setAttribute('title', 'Aucune forme à modifier');
+  }
+
+  if (deleteMsg && deleteMsg.getAttribute('title')?.includes('No layers to delete')) {
+    deleteMsg.setAttribute('title', 'Aucune forme à supprimer');
+  }
+
+  // Si du texte brut apparaît (rare)
+  document.querySelectorAll('*').forEach(el => {
+    if (el.textContent.trim() === 'No layers to edit') el.textContent = 'Aucune forme à modifier';
+    if (el.textContent.trim() === 'No layers to delete') el.textContent = 'Aucune forme à supprimer';
+  });
+}
+
+['draw:created', 'draw:deleted', 'draw:editstop'].forEach(evt => {
+  map.on(evt, () => setTimeout(translateNoLayerMessages, 0));
+});
+setTimeout(translateNoLayerMessages, 1500);
+/* ==========================================================
+   🇫🇷 TRADUCTION COMPLÈTE DE LEAFLET DRAW (DOM dynamique)
+   ========================================================== */
+
+/* --- 1️⃣ Traduction de la barre grise (Finish / Delete last point / Cancel) --- */
+function translateDrawActions() {
+  const bar = document.querySelector('.leaflet-draw-actions');
+  if (!bar) return;
+  const links = bar.querySelectorAll('a');
+
+  if (links[0]) {
+    links[0].textContent = 'Terminer';
+    links[0].setAttribute('title', 'Terminer le dessin');
+  }
+  if (links[1]) {
+    links[1].textContent = 'Supprimer le dernier point';
+    links[1].setAttribute('title', 'Supprimer le dernier point dessiné');
+  }
+  if (links[2]) {
+    links[2].textContent = 'Annuler';
+    links[2].setAttribute('title', 'Annuler le dessin');
+  }
+}
+
+['draw:drawstart', 'draw:created', 'draw:editstart', 'draw:editstop'].forEach(evt => {
+  map.on(evt, () => setTimeout(translateDrawActions, 0));
+});
+setTimeout(translateDrawActions, 800);
+
+
+/* --- 2️⃣ Traduction des boutons de la toolbar principale (icônes de gauche) --- */
+function translateToolbarTitles() {
+  const q = sel => document.querySelector(sel);
+
+  const btnPolyline = q('.leaflet-draw-draw-polyline');
+  if (btnPolyline) {
+    btnPolyline.setAttribute('title', 'Tracer une ligne');
+    btnPolyline.querySelector('span')?.remove();
+  }
+
+  const btnPolygon = q('.leaflet-draw-draw-polygon');
+  if (btnPolygon) {
+    btnPolygon.setAttribute('title', 'Tracer un polygone');
+    btnPolygon.querySelector('span')?.remove();
+  }
+
+  const btnEdit = q('.leaflet-draw-edit-edit');
+  if (btnEdit) {
+    btnEdit.setAttribute('title', 'Modifier des formes');
+    btnEdit.querySelector('span')?.remove();
+  }
+
+  const btnDelete = q('.leaflet-draw-edit-remove');
+  if (btnDelete) {
+    btnDelete.setAttribute('title', 'Supprimer des formes');
+    btnDelete.querySelector('span')?.remove();
+  }
+}
+
+setTimeout(translateToolbarTitles, 0);
+setTimeout(translateToolbarTitles, 800);
+
+
+/* --- 3️⃣ (corrigée) Traduction de la barre d’édition : Save / Cancel / Clear All --- */
+function translateEditActions() {
+  const bars = document.querySelectorAll('.leaflet-draw-actions');
+
+  bars.forEach(bar => {
+    const links = bar.querySelectorAll('a');
+    links.forEach(link => {
+      const txt = link.textContent.trim();
+
+      // anglais -> français
+      if (txt === 'Save') {
+        link.textContent = 'Enregistrer';
+        link.setAttribute('title', 'Enregistrer les modifications');
+      } else if (txt === 'Cancel') {
+        link.textContent = 'Annuler';
+        link.setAttribute('title', 'Annuler les modifications');
+      } else if (txt === 'Clear All' || txt === 'Clear all' || txt === 'Clear') {
+        link.textContent = 'Tout supprimer';
+        link.setAttribute('title', 'Supprimer toutes les formes');
+      }
+
+      // correction d’un éventuel typo déjà passé
+      if (txt === 'Enregister') {                 // <- faute courante
+        link.textContent = 'Enregistrer';
+        link.setAttribute('title', 'Enregistrer les modifications');
+      }
+    });
+  });
+}
+
+// Assure qu’on traduit aussi en mode suppression
+['draw:editstart','draw:editvertex','draw:editstop','draw:deletestart','draw:deleted']
+  .forEach(evt => map.on(evt, () => setTimeout(translateEditActions, 0)));
+
+// Optionnel : une passe après chargement
+setTimeout(translateEditActions, 1000);
+
+
+
+/* --- 4️⃣ Traduction des messages "No layers to edit / delete" --- */
+function translateNoLayerMessages() {
+  const editMsg = document.querySelector('.leaflet-draw-edit-edit.leaflet-disabled');
+  const deleteMsg = document.querySelector('.leaflet-draw-edit-remove.leaflet-disabled');
+
+  if (editMsg && editMsg.getAttribute('title')?.includes('No layers to edit')) {
+    editMsg.setAttribute('title', 'Aucune forme à modifier');
+  }
+
+  if (deleteMsg && deleteMsg.getAttribute('title')?.includes('No layers to delete')) {
+    deleteMsg.setAttribute('title', 'Aucune forme à supprimer');
+  }
+
+  document.querySelectorAll('*').forEach(el => {
+    if (el.textContent.trim() === 'No layers to edit') el.textContent = 'Aucune forme à modifier';
+    if (el.textContent.trim() === 'No layers to delete') el.textContent = 'Aucune forme à supprimer';
+  });
+}
+
+['draw:created', 'draw:deleted', 'draw:editstop'].forEach(evt => {
+  map.on(evt, () => setTimeout(translateNoLayerMessages, 0));
+});
+setTimeout(translateNoLayerMessages, 1500);
+
+
+/* --- 5️⃣ Re-traduire les boutons Edit/Delete après chaque action --- */
+function retriggerToolbarTranslation() {
+  setTimeout(() => {
+    translateToolbarTitles();
+    translateNoLayerMessages();
+  }, 300);
+}
+
+[
+  'draw:created',
+  'draw:deleted',
+  'draw:editstop',
+  'draw:drawstop',
+  'draw:editstart',
+  'draw:deletestart',
+  'draw:editvertex'
+].forEach(evt => {
+  map.on(evt, retriggerToolbarTranslation);
+});
+
+/* --- Exécution initiale pour s’assurer que tout est traduit --- */
+setTimeout(() => {
+  translateToolbarTitles();
+  translateNoLayerMessages();
+  translateEditActions();
+  translateDrawActions();
+}, 1000);
+
+/* ---- Polygone (surface m²) ---- */
+let poly=null,label=null;
+function toGJ(l){const r=l.getLatLngs()[0].map(p=>[p.lng,p.lat]);r.push(r[0]);
+  return{type:"Feature",geometry:{type:"Polygon",coordinates:[r]}};}
+function updateLabel(){
+  if(!poly)return;
+  const gj=toGJ(poly),a=turf.area(gj);
+  const val=Math.round(a);
+  const c=turf.centerOfMass(gj).geometry.coordinates,latlng=[c[1],c[0]];
+  const html=`<div class="area-label" title="Cliquer pour copier">${val} m²</div>`;
+  if(!label){
+    label=L.marker(latlng,{icon:L.divIcon({className:'',html,iconSize:null})}).addTo(map);
+    label.on('click',()=>copyToClipboard(`${val} m²`));
+    label.on('touchend',()=>copyToClipboard(`${val} m²`));
+  }else{
+    label.setLatLng(latlng);
+    label.setIcon(L.divIcon({className:'',html,iconSize:null}));
+    label.off('click'); label.off('touchend');
+    label.on('click',()=>copyToClipboard(`${val} m²`));
+    label.on('touchend',()=>copyToClipboard(`${val} m²`));
+  }
+}
+
+/* ---- Haie (longueur m / km) ---- */
+let hedge=null, lengthLabel=null;
+function toGJLine(l){return {type:'Feature',geometry:{type:'LineString',coordinates:l.getLatLngs().map(p=>[p.lng,p.lat])}};}
+function fmtLen(m){return m>=1000 ? (m/1000).toFixed(2)+' km' : Math.round(m)+' m';}
+function updateLengthLabel(){
+  if(!hedge) return;
+  const gj=toGJLine(hedge);
+  const lenM = turf.length(gj,{units:'kilometers'})*1000;
+  const pretty=fmtLen(lenM);
+
+  // position du label : milieu de la ligne
+  const halfKM=turf.length(gj,{units:'kilometers'})/2;
+  const mid=turf.along(gj,halfKM,{units:'kilometers'}).geometry.coordinates;
+  const latlng=[mid[1],mid[0]];
+  const html=`<div class="length-label" title="Cliquer pour copier">${pretty}</div>`;
+
+  if(!lengthLabel){
+    lengthLabel=L.marker(latlng,{icon:L.divIcon({className:'',html,iconSize:null})}).addTo(map);
+    lengthLabel.on('click',()=>copyToClipboard(pretty));
+    lengthLabel.on('touchend',()=>copyToClipboard(pretty));
+  }else{
+    lengthLabel.setLatLng(latlng);
+    lengthLabel.setIcon(L.divIcon({className:'',html,iconSize:null}));
+    lengthLabel.off('click'); lengthLabel.off('touchend');
+    lengthLabel.on('click',()=>copyToClipboard(pretty));
+    lengthLabel.on('touchend',()=>copyToClipboard(pretty));
+  }
+}
+
+/* ---- Création / édition / suppression ---- */
+map.on(L.Draw.Event.CREATED,e=>{
+  // IMPORTANT : on préserve ton comportement d’origine pour le polygone
+  if(e.layerType==='polygon'){
+    drawnItems.clearLayers();                 // (comportement original)
+    if(label){map.removeLayer(label);label=null;}
+    poly=e.layer; drawnItems.addLayer(poly);
+    poly.on('edit',updateLabel); updateLabel();
+  }
+  // Ajout : gestion de la haie (sans toucher au polygone)
+  if(e.layerType==='polyline'){
+    // On n’efface pas le polygone existant.
+    if(hedge){ drawnItems.removeLayer(hedge); } // une seule haie à la fois (sobre)
+    if(lengthLabel){ map.removeLayer(lengthLabel); lengthLabel=null; }
+    hedge=e.layer; drawnItems.addLayer(hedge);
+    hedge.on('edit',updateLengthLabel); updateLengthLabel();
+  }
+});
+
+map.on('draw:edited',()=>{
+  if(poly) updateLabel();
+  if(hedge) updateLengthLabel();
+});
+
+map.on('draw:deleted',e=>{
+  e.layers.eachLayer(l=>{
+    if(poly && l._leaflet_id===poly._leaflet_id){
+      poly=null; if(label){map.removeLayer(label);label=null;}
+    }
+    if(hedge && l._leaflet_id===hedge._leaflet_id){
+      hedge=null; if(lengthLabel){map.removeLayer(lengthLabel);lengthLabel=null;}
+    }
+  });
+});
+
+/* ---------- Mode Freeze + Loader ---------- */
+let frozen=false,frozenOverlay=null,savedLayers=[],savedZoomMax=null;
+const loader=document.getElementById('loaderOverlay');
+async function freezeView(){
+  if(frozen)return;
+  loader.classList.add('show');
+  document.body.classList.add('leaflet-frozen');
+  try{
+    const canvas=await new Promise((resolve,reject)=>leafletImage(map,(err,c)=>err?reject(err):resolve(c)));
+    const dataURL=canvas.toDataURL('image/png');
+    const bounds=map.getBounds();
+    savedLayers=[];map.eachLayer(l=>savedLayers.push(l));
+    savedLayers.forEach(l=>{if(l!==drawnItems)map.removeLayer(l);});
+    frozenOverlay=L.imageOverlay(dataURL,bounds,{zIndex:0}).addTo(map);
+    savedZoomMax=map.options.maxZoom;map.setMaxZoom(22);
+    frozen=true;
+    document.getElementById('btnFreeze').hidden=true;
+    document.getElementById('btnUnfreeze').hidden=false;
+    toast('📸 Mode photo activé');
+  }catch(e){console.error(e);toast('❌ Erreur de capture');}
+  loader.classList.remove('show');
+}
+function unfreezeView(){
+  if(!frozen)return;
+  document.body.classList.remove('leaflet-frozen');
+  if(frozenOverlay){map.removeLayer(frozenOverlay);frozenOverlay=null;}
+  if(savedLayers){savedLayers.forEach(l=>{if(!map.hasLayer(l))map.addLayer(l);});}
+  map.setMaxZoom(MAX_NET_ZOOM);
+  frozen=false;
+  document.getElementById('btnFreeze').hidden=false;
+  document.getElementById('btnUnfreeze').hidden=true;
+  toast('↩️ Retour à la carte');
+}
+document.getElementById('btnFreeze').addEventListener('click',freezeView);
+document.getElementById('btnUnfreeze').addEventListener('click',unfreezeView);
+document.getElementById('btnRaster').addEventListener('click',()=>map.hasLayer(cadRaster)?map.removeLayer(cadRaster):map.addLayer(cadRaster));
+
+
+/* ✅ Aide rapide améliorée sans modifier le HTML */
+const btnHelp = document.getElementById('btnHelp');
+const helpModal = document.getElementById('helpModal');
+const helpClose = document.getElementById('helpClose');
+
+// Fonction pour afficher la modale
+function openHelp() {
+  // Supprime les positions inline héritées
+  const content = helpModal.querySelector('.help-content');
+  if (content) {
+    content.style.top = 'auto';
+    content.style.left = 'auto';
+  }
+
+  helpModal.classList.add('show');
+  helpModal.style.display = 'flex';
+  document.body.classList.add('modal-open');
+}
+
+// Fonction pour la masquer
+function closeHelp() {
+  helpModal.classList.remove('show');
+  setTimeout(() => {
+    helpModal.style.display = 'none';
+  }, 250);
+}
+
+// ✅ Ouverture
+btnHelp?.addEventListener('click', openHelp);
+
+// ✅ Fermeture via le bouton X
+helpClose?.addEventListener('click', closeHelp);
+
+// ✅ Fermeture en cliquant à l’extérieur
+helpModal?.addEventListener('click', e => {
+  if (e.target === helpModal) closeHelp();
+});
+
+// ✅ Fermeture avec la touche Échap
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeHelp();
+});
+
+// 🔍 Ajuste la densité des tuiles selon la résolution d’écran
+if (window.devicePixelRatio > 1.5) {
+  map.options.maxNativeZoom = 20;
+  map.options.maxZoom = 22;
+}
+
+</script>
+</body>
+</html>
