@@ -120,7 +120,7 @@ html,body{height:100%;margin:0;background:#000;}
   white-space:nowrap; cursor:pointer;
   transition:background .3s;
 }
-.area-label:hover, .length-label:hover { background:rgba(0,150,0,0.5); }
+.area-label:hover, .length-label:hover { background:rgba(0, 150, 0, 0.449); }
 
 /* Style visuel de la “Haie” (polyligne fine en pointillés) */
 .haies-line{
@@ -350,8 +350,8 @@ html,body{height:100%;margin:0;background:#000;}
 .btn[hidden] {
   display: none !important;
   visibility: hidden !important;
-}
-/* ✅ Amélioration de la fenêtre d’aide (HTML inchangé) */
+} 
+ /* ✅ Amélioration de la fenêtre d’aide (HTML inchangé) */
 #helpModal {
   position: fixed;
   inset: 0;
@@ -362,12 +362,10 @@ html,body{height:100%;margin:0;background:#000;}
   justify-content: center;
   transition: opacity 0.3s ease;
 }
-
 #helpModal.show {
   display: flex;
   opacity: 1;
 }
-
 /* ✅ Conteneur du contenu d’aide */
 #helpModal .help-content {
   position: relative;
@@ -382,12 +380,10 @@ html,body{height:100%;margin:0;background:#000;}
   max-width: 420px;
   width: 90%;
 }
-
 #helpModal.show .help-content {
   transform: scale(1);
   opacity: 1;
 }
-
 /* ✅ Bouton de fermeture */
 #helpClose {
   position: absolute;
@@ -401,7 +397,6 @@ html,body{height:100%;margin:0;background:#000;}
 #helpClose:hover {
   color: #000;
 }
-
 /* ✅ Aide universelle : centrage et visibilité desktop + mobile */
 #helpModal {
   position: fixed;
@@ -413,11 +408,7 @@ html,body{height:100%;margin:0;background:#000;}
   justify-content: center;
   transition: opacity 0.3s ease;
 }
-#helpModal.show {
-  display: flex;
-  opacity: 1;
-}
-#helpModal .help-content {
+ #helpModal .help-content {
   position: relative !important;
   top: auto !important;
   left: auto !important;
@@ -454,9 +445,6 @@ html,body{height:100%;margin:0;background:#000;}
     line-height: 1.4;
   }
 }
-
-
- 
 </style>
 </head>
 
@@ -543,93 +531,89 @@ html,body{height:100%;margin:0;background:#000;}
 
 
 </div>
- <!-- Fenêtre d’aide -->
-<div class="help-modal" id="helpModal" style="display:none;">
-  <div class="help-content" style="
-    background:#fff; color:#111; padding:20px; border-radius:12px;
-    max-width:360px; font:14px system-ui; box-shadow:0 8px 30px rgba(0,0,0,0.4);
-    position:relative;top: 80px;left:980px;">
-    <div id="helpClose" style="
-      position:absolute; top:6px; right:6px; cursor:pointer;
-      font-size:18px; color:#666;">✖</div>
-  <h3 style="margin-top:0; color:#1E88E5;">ℹ️ Aide rapide</h3>
+<!-- Fenêtre d’aide -->
+<div class="help-modal" id="helpModal">
+  <div class="help-content">
+    <div id="helpClose">✖</div>
 
-<div style="display:flex; flex-direction:column; gap:6px; line-height:1.6; font:14px system-ui;">
+    <h3 style="margin-top:0; color:#1E88E5;">ℹ️ Aide rapide</h3>
 
-  <!-- 🟩 Outils de dessin -->
-  <p style="margin:0;">
-    <b>▱ Polygone :</b> dessinez une zone pour mesurer la surface (m²).<br>
-    <b>📏 Ligne :</b> tracez une ligne pour mesurer la longueur (m / km).<br>
-    <b>🗑️ Delete :</b> supprime le dernier polygone ou la ligne.<br>
-    <b>✎ Edit :</b> déplacez les sommets pour affiner la forme.
-  </p>
+    <div style="display:flex; flex-direction:column; gap:6px; line-height:1.6; font:14px system-ui;">
 
-  <hr style="border:none; border-top:1px solid #ddd; margin:6px 0;">
+      <!-- 🟩 Outils de dessin -->
+      <p style="margin:0;">
+        <b>▱ Polygone :</b> dessinez une zone pour mesurer la surface (m²).<br>
+        <b>📏 Ligne :</b> tracez une ligne pour mesurer la longueur (m / km).<br>
+        <b>🗑️ Delete :</b> supprime le dernier polygone ou la ligne.<br>
+        <b>✎ Edit :</b> déplacez les sommets pour affiner la forme.
+      </p>
 
-  <!-- 🟩 Fonctions principales -->
-  <span style="display:inline-flex; align-items:center; gap:6px;">
-    <svg viewBox="0 0 24 24" width="18" height="18" style="vertical-align:-2px;">
-      <rect x="3" y="6" width="18" height="14" rx="2" ry="2"
-            fill="none" stroke="#22c55e" stroke-width="2"/>
-      <circle cx="12" cy="13" r="4"
-              fill="none" stroke="#22c55e" stroke-width="2"/>
-      <rect x="9" y="3" width="6" height="3" rx="1" ry="1" fill="#22c55e"/>
-    </svg>
-    <b>Capture :</b> capture la carte actuelle.
-  </span>
+      <hr style="border:none; border-top:1px solid #ddd; margin:6px 0;">
 
-  <span style="display:inline-flex; align-items:center; gap:6px;">
-    <svg viewBox="0 0 24 24" width="18" height="18" style="vertical-align:-2px;">
-      <polyline points="9 14 4 9 9 4"
-                fill="none" stroke="#22c55e" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M4 9h9a7 7 0 1 1 0 14h-3"
-            fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
-    </svg>
-    <b>Retour :</b> revient à la vue interactive.
-  </span>
+      <!-- 🟩 Fonctions principales -->
+      <span style="display:inline-flex; align-items:center; gap:6px;">
+        <svg viewBox="0 0 24 24" width="18" height="18">
+          <rect x="3" y="6" width="18" height="14" rx="2" ry="2"
+                fill="none" stroke="#22c55e" stroke-width="2"/>
+          <circle cx="12" cy="13" r="4"
+                  fill="none" stroke="#22c55e" stroke-width="2"/>
+          <rect x="9" y="3" width="6" height="3" rx="1" ry="1" fill="#22c55e"/>
+        </svg>
+        <b>Capture :</b> capture la carte actuelle.
+      </span>
 
-  <span style="display:inline-flex; align-items:center; gap:6px;">
-    <svg viewBox="0 0 24 24" width="18" height="18" style="vertical-align:-2px;">
-      <circle cx="12" cy="12" r="9"
-              fill="none" stroke="#22c55e" stroke-width="2"/>
-      <circle cx="12" cy="12" r="3" fill="#22c55e"/>
-      <line x1="12" y1="2"  x2="12" y2="5"
-            stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
-      <line x1="12" y1="19" x2="12" y2="22"
-            stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
-      <line x1="2"  y1="12" x2="5"  y2="12"
-            stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
-      <line x1="19" y1="12" x2="22" y2="12"
-            stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
-    </svg>
-    <b>Localisation :</b> centrez-vous sur votre position.
-  </span>
+      <span style="display:inline-flex; align-items:center; gap:6px;">
+        <svg viewBox="0 0 24 24" width="18" height="18">
+          <polyline points="9 14 4 9 9 4"
+                    fill="none" stroke="#22c55e" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M4 9h9a7 7 0 1 1 0 14h-3"
+                fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <b>Retour :</b> revient à la vue interactive.
+      </span>
 
-  <span style="display:inline-flex; align-items:center; gap:6px;">
-    <svg viewBox="0 0 24 24" width="18" height="18" style="vertical-align:-2px;">
-      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"
-            fill="none" stroke="#22c55e" stroke-width="2"/>
-      <line x1="8" y1="3" x2="8" y2="21"
-            stroke="#22c55e" stroke-width="1.5"/>
-      <line x1="16" y1="3" x2="16" y2="21"
-            stroke="#22c55e" stroke-width="1.5"/>
-      <line x1="3" y1="8" x2="21" y2="8"
-            stroke="#22c55e" stroke-width="1.5"/>
-      <line x1="3" y1="16" x2="21" y2="16"
-            stroke="#22c55e" stroke-width="1.5"/>
-    </svg>
-    <b>Cadastre :</b> affiche ou masque le cadastre.
-  </span>
+      <span style="display:inline-flex; align-items:center; gap:6px;">
+        <svg viewBox="0 0 24 24" width="18" height="18">
+          <circle cx="12" cy="12" r="9"
+                  fill="none" stroke="#22c55e" stroke-width="2"/>
+          <circle cx="12" cy="12" r="3" fill="#22c55e"/>
+          <line x1="12" y1="2"  x2="12" y2="5"
+                stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+          <line x1="12" y1="19" x2="12" y2="22"
+                stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+          <line x1="2"  y1="12" x2="5"  y2="12"
+                stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+          <line x1="19" y1="12" x2="22" y2="12"
+                stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <b>Localisation :</b> centrez-vous sur votre position.
+      </span>
 
-</div>
+      <span style="display:inline-flex; align-items:center; gap:6px;">
+        <svg viewBox="0 0 24 24" width="18" height="18">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"
+                fill="none" stroke="#22c55e" stroke-width="2"/>
+          <line x1="8" y1="3" x2="8" y2="21"
+                stroke="#22c55e" stroke-width="1.5"/>
+          <line x1="16" y1="3" x2="16" y2="21"
+                stroke="#22c55e" stroke-width="1.5"/>
+          <line x1="3" y1="8" x2="21" y2="8"
+                stroke="#22c55e" stroke-width="1.5"/>
+          <line x1="3" y1="16" x2="21" y2="16"
+                stroke="#22c55e" stroke-width="1.5"/>
+        </svg>
+        <b>Cadastre :</b> affiche ou masque le cadastre.
+      </span>
 
+    </div>
 
-</div>
-
-    <p style="text-align:center;color:#888;margin-top:12px;">© Carte cadastrale personnalisée</p>
+    <p style="text-align:center; color:#888; margin-top:12px;">
+      © Carte cadastrale personnalisée
+    </p>
   </div>
 </div>
+ 
 
 
 <script>
